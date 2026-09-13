@@ -5,6 +5,21 @@ modules:
 lint:
   use:
     - STANDARD
+  except:
+    # STANDARD wants proto/certpilot/provider/v1/provider.proto, to mirror the
+    # package name in the directory. The package name is `certpilot.provider.v1`
+    # and that is correct — it is what appears on the wire and what a v2 would
+    # have to change.
+    #
+    # The directory is not on the wire. It only decides the Go import path, and
+    # nesting a `certpilot/` under a repository already called certpilot-gateway-sdk
+    # would rewrite every import in the core and in three gateways to satisfy a
+    # convention, changing nothing a caller can observe.
+    #
+    # This is the only exception, and it is here so `buf lint` can run in CI at
+    # all. Before this, the rule failed, nothing ran it, and the remaining
+    # STANDARD rules went unchecked as a result.
+    - PACKAGE_DIRECTORY_MATCH
 breaking:
   use:
     - FILE
