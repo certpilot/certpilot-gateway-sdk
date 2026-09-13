@@ -40,6 +40,18 @@ service CertificateProviderService {
 
   // ValidateConfig checks if a given configuration is valid for this gateway.
   rpc ValidateConfig(ValidateConfigRequest) returns (ValidateConfigResponse);
+
+  // DescribeProfile reports what a CA's own profile — a Vault role, an ACME
+  // profile — will actually produce, so a caller can check a declared key
+  // usage against reality instead of sending it and hoping.
+  //
+  // Optional. A gateway with nothing useful to say (ACME, where the profile
+  // decides in a way this contract cannot predict; selfsigned, which has no
+  // profiles because it enforces directly) returns Unimplemented, which is a
+  // supported answer and not a crash — the three reference gateways only one
+  // of them implements this, and callers must treat Unimplemented the same
+  // way they treat any other gateway not implementing an optional call.
+  rpc DescribeProfile(DescribeProfileRequest) returns (DescribeProfileResponse);
 }
 
 // ── Issue ────────────────────────────────────────────────
@@ -57,6 +69,23 @@ message IssueCertificateRequest {
   int32 validity_days = 5;
   // Provider-specific configuration as JSON.
   string provider_config = 6;
+  // Which of the CA's own templates to issue under: a Vault role, an ACME
+  // profile name (draft-ietf-acme-profiles), an AWS Private CA template ARN.
+  // Empty means the account's default, which is what every request meant
+  // before this field existed.
+  string ca_profile = 7;
+  // Requested key usage — digitalSignature, keyEncipherment, keyAgreement,
+  // keyCertSign, cRLSign, dataEncipherment, contentCommitment, encipherOnly,
+  // decipherOnly. Not every gateway can honour this: it is the CA's decision
+  // wherever the CA has its own template concept, and a gateway that cannot
+  // enforce it refuses the request rather than issuing something that only
+  // looks constrained.
+  repeated string key_usage = 8;
+  // Requested extended key usage — serverAuth, clientAuth, codeSigning,
+  // emailProtection, timeStamping, ocspSigning, any. Same caveat as
+  // key_usage: refused rather than silently ignored where it cannot be
+  // enforced.
+  repeated string extended_key_usage = 9;
 }
 
 message IssueCertificateResponse {
@@ -81,6 +110,14 @@ message RenewCertificateRequest {
   bytes current_certificate_pem = 6;
   // Provider-specific configuration as JSON.
   string provider_config = 7;
+  // See IssueCertificateRequest.ca_profile. A renewal is an issuance, and the
+  // profile that governed the original is not assumed to still apply — the
+  // caller states it again, the same way it restates domains and key type.
+  string ca_profile = 8;
+  // See IssueCertificateRequest.key_usage.
+  repeated string key_usage = 9;
+  // See IssueCertificateRequest.extended_key_usage.
+  repeated string extended_key_usage = 10;
 }
 
 message RenewCertificateResponse {
@@ -169,6 +206,14 @@ message GetCAInfoRequest {
 message GetCAInfoResponse {
   // List of CA authorities in the chain (root → intermediate → issuing).
   repeated certpilot.common.v1.CAAuthorityInfo ca_chain = 1;
+  // The CA's own profile names, when it has the concept and will say so — an
+  // ACME directory's meta.profiles, principally. Read live rather than
+  // trusted from a list compiled into a gateway: Let's Encrypt withdrew its
+  // "shortlived" profile on 8 July 2026, and a compiled-in list is exactly
+  // what gets that wrong. Empty means either the CA has no such concept or
+  // this gateway cannot enumerate it — the two are indistinguishable from
+  // here, and a caller must not treat empty as "any profile name is safe".
+  repeated string supported_profiles = 2;
 }
 
 // ── Capabilities ─────────────────────────────────────────
@@ -202,4 +247,32 @@ message ValidateConfigResponse {
   bool valid = 1;
   repeated string errors = 2;
   repeated string warnings = 3;
+}
+
+// ── Describe Profile ──────────────────────────────────────
+
+message DescribeProfileRequest {
+  // The CA's own profile name — a Vault role, an ACME profile. Required.
+  string ca_profile = 1;
+  string provider_config = 2;
+}
+
+message DescribeProfileResponse {
+  // True when this gateway can state, from the CA's own configuration rather
+  // than from what a caller asked for, exactly what key usage and extended
+  // key usage a certificate issued under this profile will carry.
+  //
+  // False means the profile decides in a way this contract cannot predict —
+  // an ACME profile is coarse by design, and this field is how a caller finds
+  // that out rather than assuming an empty list below means "unrestricted".
+  bool is_definite = 1;
+  // What the profile will produce, when is_definite is true. Not what was
+  // asked for — this call takes no requested values, because the answer does
+  // not depend on them: a Vault role's flags decide the certificate's key
+  // usage before a request is ever sent, which is the entire reason this call
+  // exists instead of sending the request and inspecting the result.
+  repeated string key_usage = 2;
+  repeated string extended_key_usage = 3;
+  // Set whenever is_definite is false, explaining why.
+  string message = 4;
 }
