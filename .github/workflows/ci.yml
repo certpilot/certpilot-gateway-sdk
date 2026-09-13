@@ -1,0 +1,82 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: build and test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      - run: go build ./...
+      - run: go test ./...
+      - run: go vet ./...
+
+      # An untidy go.mod means the module graph in the repository is not the
+      # one a consumer gets from `go get`, and this module exists to be got.
+      - name: go.mod is tidy
+        run: |
+          go mod tidy
+          git diff --exit-code -- go.mod go.sum
+
+  proto:
+    name: generated protobuf is current
+    runs-on: ubuntu-latest
+    # pb/ is generated and committed. Committing it is what makes a fresh clone
+    # buildable — `buf generate` reaches buf.build for its plugins, so a clone
+    # with no network and no buf could not produce it. The cost is that it can
+    # drift from the .proto files that produced it, silently, and this job is
+    # the thing that stops that.
+    #
+    # The version of this job in the core repository checked `git diff -- pkg/pb`
+    # after that directory had been renamed, so it compared a path that no
+    # longer existed and passed unconditionally for the whole time it ran. The
+    # `ls pb` below is there so that failure mode announces itself instead.
+    steps:
+      - uses: actions/checkout@v4
+      - uses: bufbuild/buf-setup-action@v1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: The path this job checks must exist
+        run: test -d pb || { echo "::error::pb/ is gone; this job is checking nothing"; exit 1; }
+
+      - run: buf lint
+      - run: buf generate
+
+      - name: Fail if it changed
+        run: |
+          if ! git diff --quiet -- pb; then
+            echo "::error::pb/ is out of date. Run: make proto"
+            git --no-pager diff -- pb
+            exit 1
+          fi
+          echo "Generated protobuf code matches proto/."
+
+  breaking:
+    name: the wire contract did not break
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    # The README promises that a gateway built against any v1.x keeps working
+    # against any core that speaks provider.v1. A promise nothing checks is a
+    # promise that gets broken by accident, so this checks it: field numbers,
+    # removals and type changes fail here rather than in somebody's estate.
+    #
+    # Adding fields and RPCs is fine and passes. That is the whole point of the
+    # scheme.
+    steps:
+      - uses: actions/checkout@v4
+      - uses: bufbuild/buf-setup-action@v1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+      - name: buf breaking, against main
+        run: buf breaking --against "https://github.com/${{ github.repository }}.git#branch=main"

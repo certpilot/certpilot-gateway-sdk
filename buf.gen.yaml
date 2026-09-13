@@ -6,8 +6,8 @@ managed:
       value: github.com/certpilot/certpilot-gateway-sdk/pb
 plugins:
   - remote: buf.build/protocolbuffers/go
-    out: pkg/gatewaysdk/pb
+    out: pb
     opt: paths=source_relative
   - remote: buf.build/grpc/go
-    out: pkg/gatewaysdk/pb
+    out: pb
     opt: paths=source_relative

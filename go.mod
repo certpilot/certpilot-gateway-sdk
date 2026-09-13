@@ -1,9 +1,8 @@
-// The contract between the core and a certificate authority gateway.
+// The contract between the CertPilot core and a certificate authority gateway.
 //
-// The module path is the repository this will live in, not the directory it is
-// in today. That is the point: when #43 moves it out, the only thing that
-// changes is the `replace` each consumer carries — no import in this tree is
-// rewritten twice.
+// Published separately from the core so that a gateway can be written without
+// commit access to it. A version here is a promise about a wire contract
+// rather than a Go API; see README.md, which states that promise in full.
 module github.com/certpilot/certpilot-gateway-sdk
 
 go 1.26.6
