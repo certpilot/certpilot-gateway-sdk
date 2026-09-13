@@ -95,8 +95,25 @@ type IssueCertificateRequest struct {
 	ValidityDays int32 `protobuf:"varint,5,opt,name=validity_days,json=validityDays,proto3" json:"validity_days,omitempty"`
 	// Provider-specific configuration as JSON.
 	ProviderConfig string `protobuf:"bytes,6,opt,name=provider_config,json=providerConfig,proto3" json:"provider_config,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// Which of the CA's own templates to issue under: a Vault role, an ACME
+	// profile name (draft-ietf-acme-profiles), an AWS Private CA template ARN.
+	// Empty means the account's default, which is what every request meant
+	// before this field existed.
+	CaProfile string `protobuf:"bytes,7,opt,name=ca_profile,json=caProfile,proto3" json:"ca_profile,omitempty"`
+	// Requested key usage — digitalSignature, keyEncipherment, keyAgreement,
+	// keyCertSign, cRLSign, dataEncipherment, contentCommitment, encipherOnly,
+	// decipherOnly. Not every gateway can honour this: it is the CA's decision
+	// wherever the CA has its own template concept, and a gateway that cannot
+	// enforce it refuses the request rather than issuing something that only
+	// looks constrained.
+	KeyUsage []string `protobuf:"bytes,8,rep,name=key_usage,json=keyUsage,proto3" json:"key_usage,omitempty"`
+	// Requested extended key usage — serverAuth, clientAuth, codeSigning,
+	// emailProtection, timeStamping, ocspSigning, any. Same caveat as
+	// key_usage: refused rather than silently ignored where it cannot be
+	// enforced.
+	ExtendedKeyUsage []string `protobuf:"bytes,9,rep,name=extended_key_usage,json=extendedKeyUsage,proto3" json:"extended_key_usage,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *IssueCertificateRequest) Reset() {
@@ -171,6 +188,27 @@ func (x *IssueCertificateRequest) GetProviderConfig() string {
 	return ""
 }
 
+func (x *IssueCertificateRequest) GetCaProfile() string {
+	if x != nil {
+		return x.CaProfile
+	}
+	return ""
+}
+
+func (x *IssueCertificateRequest) GetKeyUsage() []string {
+	if x != nil {
+		return x.KeyUsage
+	}
+	return nil
+}
+
+func (x *IssueCertificateRequest) GetExtendedKeyUsage() []string {
+	if x != nil {
+		return x.ExtendedKeyUsage
+	}
+	return nil
+}
+
 type IssueCertificateResponse struct {
 	state       protoimpl.MessageState `protogen:"open.v1"`
 	Certificate *v1.CertificateInfo    `protobuf:"bytes,1,opt,name=certificate,proto3" json:"certificate,omitempty"`
@@ -239,8 +277,16 @@ type RenewCertificateRequest struct {
 	CurrentCertificatePem []byte `protobuf:"bytes,6,opt,name=current_certificate_pem,json=currentCertificatePem,proto3" json:"current_certificate_pem,omitempty"`
 	// Provider-specific configuration as JSON.
 	ProviderConfig string `protobuf:"bytes,7,opt,name=provider_config,json=providerConfig,proto3" json:"provider_config,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// See IssueCertificateRequest.ca_profile. A renewal is an issuance, and the
+	// profile that governed the original is not assumed to still apply — the
+	// caller states it again, the same way it restates domains and key type.
+	CaProfile string `protobuf:"bytes,8,opt,name=ca_profile,json=caProfile,proto3" json:"ca_profile,omitempty"`
+	// See IssueCertificateRequest.key_usage.
+	KeyUsage []string `protobuf:"bytes,9,rep,name=key_usage,json=keyUsage,proto3" json:"key_usage,omitempty"`
+	// See IssueCertificateRequest.extended_key_usage.
+	ExtendedKeyUsage []string `protobuf:"bytes,10,rep,name=extended_key_usage,json=extendedKeyUsage,proto3" json:"extended_key_usage,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *RenewCertificateRequest) Reset() {
@@ -320,6 +366,27 @@ func (x *RenewCertificateRequest) GetProviderConfig() string {
 		return x.ProviderConfig
 	}
 	return ""
+}
+
+func (x *RenewCertificateRequest) GetCaProfile() string {
+	if x != nil {
+		return x.CaProfile
+	}
+	return ""
+}
+
+func (x *RenewCertificateRequest) GetKeyUsage() []string {
+	if x != nil {
+		return x.KeyUsage
+	}
+	return nil
+}
+
+func (x *RenewCertificateRequest) GetExtendedKeyUsage() []string {
+	if x != nil {
+		return x.ExtendedKeyUsage
+	}
+	return nil
 }
 
 type RenewCertificateResponse struct {
@@ -771,9 +838,17 @@ func (x *GetCAInfoRequest) GetProviderConfig() string {
 type GetCAInfoResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// List of CA authorities in the chain (root → intermediate → issuing).
-	CaChain       []*v1.CAAuthorityInfo `protobuf:"bytes,1,rep,name=ca_chain,json=caChain,proto3" json:"ca_chain,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	CaChain []*v1.CAAuthorityInfo `protobuf:"bytes,1,rep,name=ca_chain,json=caChain,proto3" json:"ca_chain,omitempty"`
+	// The CA's own profile names, when it has the concept and will say so — an
+	// ACME directory's meta.profiles, principally. Read live rather than
+	// trusted from a list compiled into a gateway: Let's Encrypt withdrew its
+	// "shortlived" profile on 8 July 2026, and a compiled-in list is exactly
+	// what gets that wrong. Empty means either the CA has no such concept or
+	// this gateway cannot enumerate it — the two are indistinguishable from
+	// here, and a caller must not treat empty as "any profile name is safe".
+	SupportedProfiles []string `protobuf:"bytes,2,rep,name=supported_profiles,json=supportedProfiles,proto3" json:"supported_profiles,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *GetCAInfoResponse) Reset() {
@@ -809,6 +884,13 @@ func (*GetCAInfoResponse) Descriptor() ([]byte, []int) {
 func (x *GetCAInfoResponse) GetCaChain() []*v1.CAAuthorityInfo {
 	if x != nil {
 		return x.CaChain
+	}
+	return nil
+}
+
+func (x *GetCAInfoResponse) GetSupportedProfiles() []string {
+	if x != nil {
+		return x.SupportedProfiles
 	}
 	return nil
 }
@@ -1103,21 +1185,159 @@ func (x *ValidateConfigResponse) GetWarnings() []string {
 	return nil
 }
 
+type DescribeProfileRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The CA's own profile name — a Vault role, an ACME profile. Required.
+	CaProfile      string `protobuf:"bytes,1,opt,name=ca_profile,json=caProfile,proto3" json:"ca_profile,omitempty"`
+	ProviderConfig string `protobuf:"bytes,2,opt,name=provider_config,json=providerConfig,proto3" json:"provider_config,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *DescribeProfileRequest) Reset() {
+	*x = DescribeProfileRequest{}
+	mi := &file_provider_v1_provider_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DescribeProfileRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DescribeProfileRequest) ProtoMessage() {}
+
+func (x *DescribeProfileRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_provider_v1_provider_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DescribeProfileRequest.ProtoReflect.Descriptor instead.
+func (*DescribeProfileRequest) Descriptor() ([]byte, []int) {
+	return file_provider_v1_provider_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *DescribeProfileRequest) GetCaProfile() string {
+	if x != nil {
+		return x.CaProfile
+	}
+	return ""
+}
+
+func (x *DescribeProfileRequest) GetProviderConfig() string {
+	if x != nil {
+		return x.ProviderConfig
+	}
+	return ""
+}
+
+type DescribeProfileResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// True when this gateway can state, from the CA's own configuration rather
+	// than from what a caller asked for, exactly what key usage and extended
+	// key usage a certificate issued under this profile will carry.
+	//
+	// False means the profile decides in a way this contract cannot predict —
+	// an ACME profile is coarse by design, and this field is how a caller finds
+	// that out rather than assuming an empty list below means "unrestricted".
+	IsDefinite bool `protobuf:"varint,1,opt,name=is_definite,json=isDefinite,proto3" json:"is_definite,omitempty"`
+	// What the profile will produce, when is_definite is true. Not what was
+	// asked for — this call takes no requested values, because the answer does
+	// not depend on them: a Vault role's flags decide the certificate's key
+	// usage before a request is ever sent, which is the entire reason this call
+	// exists instead of sending the request and inspecting the result.
+	KeyUsage         []string `protobuf:"bytes,2,rep,name=key_usage,json=keyUsage,proto3" json:"key_usage,omitempty"`
+	ExtendedKeyUsage []string `protobuf:"bytes,3,rep,name=extended_key_usage,json=extendedKeyUsage,proto3" json:"extended_key_usage,omitempty"`
+	// Set whenever is_definite is false, explaining why.
+	Message       string `protobuf:"bytes,4,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DescribeProfileResponse) Reset() {
+	*x = DescribeProfileResponse{}
+	mi := &file_provider_v1_provider_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DescribeProfileResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DescribeProfileResponse) ProtoMessage() {}
+
+func (x *DescribeProfileResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_provider_v1_provider_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DescribeProfileResponse.ProtoReflect.Descriptor instead.
+func (*DescribeProfileResponse) Descriptor() ([]byte, []int) {
+	return file_provider_v1_provider_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *DescribeProfileResponse) GetIsDefinite() bool {
+	if x != nil {
+		return x.IsDefinite
+	}
+	return false
+}
+
+func (x *DescribeProfileResponse) GetKeyUsage() []string {
+	if x != nil {
+		return x.KeyUsage
+	}
+	return nil
+}
+
+func (x *DescribeProfileResponse) GetExtendedKeyUsage() []string {
+	if x != nil {
+		return x.ExtendedKeyUsage
+	}
+	return nil
+}
+
+func (x *DescribeProfileResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
 var File_provider_v1_provider_proto protoreflect.FileDescriptor
 
 const file_provider_v1_provider_proto_rawDesc = "" +
 	"\n" +
-	"\x1aprovider/v1/provider.proto\x12\x15certpilot.provider.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x15common/v1/types.proto\"\xd0\x01\n" +
+	"\x1aprovider/v1/provider.proto\x12\x15certpilot.provider.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x15common/v1/types.proto\"\xba\x02\n" +
 	"\x17IssueCertificateRequest\x12\x17\n" +
 	"\acsr_pem\x18\x01 \x01(\fR\x06csrPem\x12\x18\n" +
 	"\adomains\x18\x02 \x03(\tR\adomains\x12\x19\n" +
 	"\bkey_type\x18\x03 \x01(\tR\akeyType\x12\x19\n" +
 	"\bkey_size\x18\x04 \x01(\x05R\akeySize\x12#\n" +
 	"\rvalidity_days\x18\x05 \x01(\x05R\fvalidityDays\x12'\n" +
-	"\x0fprovider_config\x18\x06 \x01(\tR\x0eproviderConfig\"\x9a\x01\n" +
+	"\x0fprovider_config\x18\x06 \x01(\tR\x0eproviderConfig\x12\x1d\n" +
+	"\n" +
+	"ca_profile\x18\a \x01(\tR\tcaProfile\x12\x1b\n" +
+	"\tkey_usage\x18\b \x03(\tR\bkeyUsage\x12,\n" +
+	"\x12extended_key_usage\x18\t \x03(\tR\x10extendedKeyUsage\"\x9a\x01\n" +
 	"\x18IssueCertificateResponse\x12F\n" +
 	"\vcertificate\x18\x01 \x01(\v2$.certpilot.common.v1.CertificateInfoR\vcertificate\x126\n" +
-	"\x17provider_certificate_id\x18\x02 \x01(\tR\x15providerCertificateId\"\x9b\x02\n" +
+	"\x17provider_certificate_id\x18\x02 \x01(\tR\x15providerCertificateId\"\x85\x03\n" +
 	"\x17RenewCertificateRequest\x126\n" +
 	"\x17provider_certificate_id\x18\x01 \x01(\tR\x15providerCertificateId\x12\x17\n" +
 	"\acsr_pem\x18\x02 \x01(\fR\x06csrPem\x12\x18\n" +
@@ -1125,7 +1345,12 @@ const file_provider_v1_provider_proto_rawDesc = "" +
 	"\bkey_type\x18\x04 \x01(\tR\akeyType\x12\x19\n" +
 	"\bkey_size\x18\x05 \x01(\x05R\akeySize\x126\n" +
 	"\x17current_certificate_pem\x18\x06 \x01(\fR\x15currentCertificatePem\x12'\n" +
-	"\x0fprovider_config\x18\a \x01(\tR\x0eproviderConfig\"\x9a\x01\n" +
+	"\x0fprovider_config\x18\a \x01(\tR\x0eproviderConfig\x12\x1d\n" +
+	"\n" +
+	"ca_profile\x18\b \x01(\tR\tcaProfile\x12\x1b\n" +
+	"\tkey_usage\x18\t \x03(\tR\bkeyUsage\x12,\n" +
+	"\x12extended_key_usage\x18\n" +
+	" \x03(\tR\x10extendedKeyUsage\"\x9a\x01\n" +
 	"\x18RenewCertificateResponse\x12F\n" +
 	"\vcertificate\x18\x01 \x01(\v2$.certpilot.common.v1.CertificateInfoR\vcertificate\x126\n" +
 	"\x17provider_certificate_id\x18\x02 \x01(\tR\x15providerCertificateId\"\xbc\x01\n" +
@@ -1154,9 +1379,10 @@ const file_provider_v1_provider_proto_rawDesc = "" +
 	"\trenew_now\x18\x04 \x01(\bR\brenewNow\x12.\n" +
 	"\x13retry_after_seconds\x18\x05 \x01(\x03R\x11retryAfterSeconds\";\n" +
 	"\x10GetCAInfoRequest\x12'\n" +
-	"\x0fprovider_config\x18\x01 \x01(\tR\x0eproviderConfig\"T\n" +
+	"\x0fprovider_config\x18\x01 \x01(\tR\x0eproviderConfig\"\x83\x01\n" +
 	"\x11GetCAInfoResponse\x12?\n" +
-	"\bca_chain\x18\x01 \x03(\v2$.certpilot.common.v1.CAAuthorityInfoR\acaChain\"\x18\n" +
+	"\bca_chain\x18\x01 \x03(\v2$.certpilot.common.v1.CAAuthorityInfoR\acaChain\x12-\n" +
+	"\x12supported_profiles\x18\x02 \x03(\tR\x11supportedProfiles\"\x18\n" +
 	"\x16GetCapabilitiesRequest\"h\n" +
 	"\x17GetCapabilitiesResponse\x12M\n" +
 	"\fcapabilities\x18\x01 \x01(\v2).certpilot.common.v1.ProviderCapabilitiesR\fcapabilities\"\x14\n" +
@@ -1174,7 +1400,17 @@ const file_provider_v1_provider_proto_rawDesc = "" +
 	"\x16ValidateConfigResponse\x12\x14\n" +
 	"\x05valid\x18\x01 \x01(\bR\x05valid\x12\x16\n" +
 	"\x06errors\x18\x02 \x03(\tR\x06errors\x12\x1a\n" +
-	"\bwarnings\x18\x03 \x03(\tR\bwarnings*\xa4\x01\n" +
+	"\bwarnings\x18\x03 \x03(\tR\bwarnings\"`\n" +
+	"\x16DescribeProfileRequest\x12\x1d\n" +
+	"\n" +
+	"ca_profile\x18\x01 \x01(\tR\tcaProfile\x12'\n" +
+	"\x0fprovider_config\x18\x02 \x01(\tR\x0eproviderConfig\"\x9f\x01\n" +
+	"\x17DescribeProfileResponse\x12\x1f\n" +
+	"\vis_definite\x18\x01 \x01(\bR\n" +
+	"isDefinite\x12\x1b\n" +
+	"\tkey_usage\x18\x02 \x03(\tR\bkeyUsage\x12,\n" +
+	"\x12extended_key_usage\x18\x03 \x03(\tR\x10extendedKeyUsage\x12\x18\n" +
+	"\amessage\x18\x04 \x01(\tR\amessage*\xa4\x01\n" +
 	"\n" +
 	"CertStatus\x12\x1b\n" +
 	"\x17CERT_STATUS_UNSPECIFIED\x10\x00\x12\x15\n" +
@@ -1182,7 +1418,7 @@ const file_provider_v1_provider_proto_rawDesc = "" +
 	"\x13CERT_STATUS_EXPIRED\x10\x02\x12\x17\n" +
 	"\x13CERT_STATUS_REVOKED\x10\x03\x12\x17\n" +
 	"\x13CERT_STATUS_PENDING\x10\x04\x12\x17\n" +
-	"\x13CERT_STATUS_UNKNOWN\x10\x052\xa6\a\n" +
+	"\x13CERT_STATUS_UNKNOWN\x10\x052\x98\b\n" +
 	"\x1aCertificateProviderService\x12s\n" +
 	"\x10IssueCertificate\x12..certpilot.provider.v1.IssueCertificateRequest\x1a/.certpilot.provider.v1.IssueCertificateResponse\x12s\n" +
 	"\x10RenewCertificate\x12..certpilot.provider.v1.RenewCertificateRequest\x1a/.certpilot.provider.v1.RenewCertificateResponse\x12v\n" +
@@ -1191,7 +1427,8 @@ const file_provider_v1_provider_proto_rawDesc = "" +
 	"\tGetCAInfo\x12'.certpilot.provider.v1.GetCAInfoRequest\x1a(.certpilot.provider.v1.GetCAInfoResponse\x12p\n" +
 	"\x0fGetCapabilities\x12-.certpilot.provider.v1.GetCapabilitiesRequest\x1a..certpilot.provider.v1.GetCapabilitiesResponse\x12d\n" +
 	"\vHealthCheck\x12).certpilot.provider.v1.HealthCheckRequest\x1a*.certpilot.provider.v1.HealthCheckResponse\x12m\n" +
-	"\x0eValidateConfig\x12,.certpilot.provider.v1.ValidateConfigRequest\x1a-.certpilot.provider.v1.ValidateConfigResponseB\xe6\x01\n" +
+	"\x0eValidateConfig\x12,.certpilot.provider.v1.ValidateConfigRequest\x1a-.certpilot.provider.v1.ValidateConfigResponse\x12p\n" +
+	"\x0fDescribeProfile\x12-.certpilot.provider.v1.DescribeProfileRequest\x1a..certpilot.provider.v1.DescribeProfileResponseB\xe6\x01\n" +
 	"\x19com.certpilot.provider.v1B\rProviderProtoP\x01ZDgithub.com/certpilot/certpilot-gateway-sdk/pb/provider/v1;providerv1\xa2\x02\x03CPX\xaa\x02\x15Certpilot.Provider.V1\xca\x02\x15Certpilot\\Provider\\V1\xe2\x02!Certpilot\\Provider\\V1\\GPBMetadata\xea\x02\x17Certpilot::Provider::V1b\x06proto3"
 
 var (
@@ -1207,7 +1444,7 @@ func file_provider_v1_provider_proto_rawDescGZIP() []byte {
 }
 
 var file_provider_v1_provider_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_provider_v1_provider_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
+var file_provider_v1_provider_proto_msgTypes = make([]protoimpl.MessageInfo, 19)
 var file_provider_v1_provider_proto_goTypes = []any{
 	(CertStatus)(0),                      // 0: certpilot.provider.v1.CertStatus
 	(*IssueCertificateRequest)(nil),      // 1: certpilot.provider.v1.IssueCertificateRequest
@@ -1227,24 +1464,26 @@ var file_provider_v1_provider_proto_goTypes = []any{
 	(*HealthCheckResponse)(nil),          // 15: certpilot.provider.v1.HealthCheckResponse
 	(*ValidateConfigRequest)(nil),        // 16: certpilot.provider.v1.ValidateConfigRequest
 	(*ValidateConfigResponse)(nil),       // 17: certpilot.provider.v1.ValidateConfigResponse
-	(*v1.CertificateInfo)(nil),           // 18: certpilot.common.v1.CertificateInfo
-	(*timestamppb.Timestamp)(nil),        // 19: google.protobuf.Timestamp
-	(*v1.CAAuthorityInfo)(nil),           // 20: certpilot.common.v1.CAAuthorityInfo
-	(*v1.ProviderCapabilities)(nil),      // 21: certpilot.common.v1.ProviderCapabilities
-	(v1.HealthStatus)(0),                 // 22: certpilot.common.v1.HealthStatus
+	(*DescribeProfileRequest)(nil),       // 18: certpilot.provider.v1.DescribeProfileRequest
+	(*DescribeProfileResponse)(nil),      // 19: certpilot.provider.v1.DescribeProfileResponse
+	(*v1.CertificateInfo)(nil),           // 20: certpilot.common.v1.CertificateInfo
+	(*timestamppb.Timestamp)(nil),        // 21: google.protobuf.Timestamp
+	(*v1.CAAuthorityInfo)(nil),           // 22: certpilot.common.v1.CAAuthorityInfo
+	(*v1.ProviderCapabilities)(nil),      // 23: certpilot.common.v1.ProviderCapabilities
+	(v1.HealthStatus)(0),                 // 24: certpilot.common.v1.HealthStatus
 }
 var file_provider_v1_provider_proto_depIdxs = []int32{
-	18, // 0: certpilot.provider.v1.IssueCertificateResponse.certificate:type_name -> certpilot.common.v1.CertificateInfo
-	18, // 1: certpilot.provider.v1.RenewCertificateResponse.certificate:type_name -> certpilot.common.v1.CertificateInfo
+	20, // 0: certpilot.provider.v1.IssueCertificateResponse.certificate:type_name -> certpilot.common.v1.CertificateInfo
+	20, // 1: certpilot.provider.v1.RenewCertificateResponse.certificate:type_name -> certpilot.common.v1.CertificateInfo
 	0,  // 2: certpilot.provider.v1.GetCertificateStatusResponse.status:type_name -> certpilot.provider.v1.CertStatus
-	19, // 3: certpilot.provider.v1.GetCertificateStatusResponse.expires_at:type_name -> google.protobuf.Timestamp
+	21, // 3: certpilot.provider.v1.GetCertificateStatusResponse.expires_at:type_name -> google.protobuf.Timestamp
 	9,  // 4: certpilot.provider.v1.GetCertificateStatusResponse.renewal_window:type_name -> certpilot.provider.v1.RenewalWindow
-	19, // 5: certpilot.provider.v1.RenewalWindow.start:type_name -> google.protobuf.Timestamp
-	19, // 6: certpilot.provider.v1.RenewalWindow.end:type_name -> google.protobuf.Timestamp
-	20, // 7: certpilot.provider.v1.GetCAInfoResponse.ca_chain:type_name -> certpilot.common.v1.CAAuthorityInfo
-	21, // 8: certpilot.provider.v1.GetCapabilitiesResponse.capabilities:type_name -> certpilot.common.v1.ProviderCapabilities
-	22, // 9: certpilot.provider.v1.HealthCheckResponse.status:type_name -> certpilot.common.v1.HealthStatus
-	19, // 10: certpilot.provider.v1.HealthCheckResponse.checked_at:type_name -> google.protobuf.Timestamp
+	21, // 5: certpilot.provider.v1.RenewalWindow.start:type_name -> google.protobuf.Timestamp
+	21, // 6: certpilot.provider.v1.RenewalWindow.end:type_name -> google.protobuf.Timestamp
+	22, // 7: certpilot.provider.v1.GetCAInfoResponse.ca_chain:type_name -> certpilot.common.v1.CAAuthorityInfo
+	23, // 8: certpilot.provider.v1.GetCapabilitiesResponse.capabilities:type_name -> certpilot.common.v1.ProviderCapabilities
+	24, // 9: certpilot.provider.v1.HealthCheckResponse.status:type_name -> certpilot.common.v1.HealthStatus
+	21, // 10: certpilot.provider.v1.HealthCheckResponse.checked_at:type_name -> google.protobuf.Timestamp
 	1,  // 11: certpilot.provider.v1.CertificateProviderService.IssueCertificate:input_type -> certpilot.provider.v1.IssueCertificateRequest
 	3,  // 12: certpilot.provider.v1.CertificateProviderService.RenewCertificate:input_type -> certpilot.provider.v1.RenewCertificateRequest
 	5,  // 13: certpilot.provider.v1.CertificateProviderService.RevokeCertificate:input_type -> certpilot.provider.v1.RevokeCertificateRequest
@@ -1253,16 +1492,18 @@ var file_provider_v1_provider_proto_depIdxs = []int32{
 	12, // 16: certpilot.provider.v1.CertificateProviderService.GetCapabilities:input_type -> certpilot.provider.v1.GetCapabilitiesRequest
 	14, // 17: certpilot.provider.v1.CertificateProviderService.HealthCheck:input_type -> certpilot.provider.v1.HealthCheckRequest
 	16, // 18: certpilot.provider.v1.CertificateProviderService.ValidateConfig:input_type -> certpilot.provider.v1.ValidateConfigRequest
-	2,  // 19: certpilot.provider.v1.CertificateProviderService.IssueCertificate:output_type -> certpilot.provider.v1.IssueCertificateResponse
-	4,  // 20: certpilot.provider.v1.CertificateProviderService.RenewCertificate:output_type -> certpilot.provider.v1.RenewCertificateResponse
-	6,  // 21: certpilot.provider.v1.CertificateProviderService.RevokeCertificate:output_type -> certpilot.provider.v1.RevokeCertificateResponse
-	8,  // 22: certpilot.provider.v1.CertificateProviderService.GetCertificateStatus:output_type -> certpilot.provider.v1.GetCertificateStatusResponse
-	11, // 23: certpilot.provider.v1.CertificateProviderService.GetCAInfo:output_type -> certpilot.provider.v1.GetCAInfoResponse
-	13, // 24: certpilot.provider.v1.CertificateProviderService.GetCapabilities:output_type -> certpilot.provider.v1.GetCapabilitiesResponse
-	15, // 25: certpilot.provider.v1.CertificateProviderService.HealthCheck:output_type -> certpilot.provider.v1.HealthCheckResponse
-	17, // 26: certpilot.provider.v1.CertificateProviderService.ValidateConfig:output_type -> certpilot.provider.v1.ValidateConfigResponse
-	19, // [19:27] is the sub-list for method output_type
-	11, // [11:19] is the sub-list for method input_type
+	18, // 19: certpilot.provider.v1.CertificateProviderService.DescribeProfile:input_type -> certpilot.provider.v1.DescribeProfileRequest
+	2,  // 20: certpilot.provider.v1.CertificateProviderService.IssueCertificate:output_type -> certpilot.provider.v1.IssueCertificateResponse
+	4,  // 21: certpilot.provider.v1.CertificateProviderService.RenewCertificate:output_type -> certpilot.provider.v1.RenewCertificateResponse
+	6,  // 22: certpilot.provider.v1.CertificateProviderService.RevokeCertificate:output_type -> certpilot.provider.v1.RevokeCertificateResponse
+	8,  // 23: certpilot.provider.v1.CertificateProviderService.GetCertificateStatus:output_type -> certpilot.provider.v1.GetCertificateStatusResponse
+	11, // 24: certpilot.provider.v1.CertificateProviderService.GetCAInfo:output_type -> certpilot.provider.v1.GetCAInfoResponse
+	13, // 25: certpilot.provider.v1.CertificateProviderService.GetCapabilities:output_type -> certpilot.provider.v1.GetCapabilitiesResponse
+	15, // 26: certpilot.provider.v1.CertificateProviderService.HealthCheck:output_type -> certpilot.provider.v1.HealthCheckResponse
+	17, // 27: certpilot.provider.v1.CertificateProviderService.ValidateConfig:output_type -> certpilot.provider.v1.ValidateConfigResponse
+	19, // 28: certpilot.provider.v1.CertificateProviderService.DescribeProfile:output_type -> certpilot.provider.v1.DescribeProfileResponse
+	20, // [20:29] is the sub-list for method output_type
+	11, // [11:20] is the sub-list for method input_type
 	11, // [11:11] is the sub-list for extension type_name
 	11, // [11:11] is the sub-list for extension extendee
 	0,  // [0:11] is the sub-list for field type_name
@@ -1279,7 +1520,7 @@ func file_provider_v1_provider_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_provider_v1_provider_proto_rawDesc), len(file_provider_v1_provider_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   17,
+			NumMessages:   19,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

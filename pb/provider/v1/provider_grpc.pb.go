@@ -27,6 +27,7 @@ const (
 	CertificateProviderService_GetCapabilities_FullMethodName      = "/certpilot.provider.v1.CertificateProviderService/GetCapabilities"
 	CertificateProviderService_HealthCheck_FullMethodName          = "/certpilot.provider.v1.CertificateProviderService/HealthCheck"
 	CertificateProviderService_ValidateConfig_FullMethodName       = "/certpilot.provider.v1.CertificateProviderService/ValidateConfig"
+	CertificateProviderService_DescribeProfile_FullMethodName      = "/certpilot.provider.v1.CertificateProviderService/DescribeProfile"
 )
 
 // CertificateProviderServiceClient is the client API for CertificateProviderService service.
@@ -53,6 +54,17 @@ type CertificateProviderServiceClient interface {
 	HealthCheck(ctx context.Context, in *HealthCheckRequest, opts ...grpc.CallOption) (*HealthCheckResponse, error)
 	// ValidateConfig checks if a given configuration is valid for this gateway.
 	ValidateConfig(ctx context.Context, in *ValidateConfigRequest, opts ...grpc.CallOption) (*ValidateConfigResponse, error)
+	// DescribeProfile reports what a CA's own profile — a Vault role, an ACME
+	// profile — will actually produce, so a caller can check a declared key
+	// usage against reality instead of sending it and hoping.
+	//
+	// Optional. A gateway with nothing useful to say (ACME, where the profile
+	// decides in a way this contract cannot predict; selfsigned, which has no
+	// profiles because it enforces directly) returns Unimplemented, which is a
+	// supported answer and not a crash — the three reference gateways only one
+	// of them implements this, and callers must treat Unimplemented the same
+	// way they treat any other gateway not implementing an optional call.
+	DescribeProfile(ctx context.Context, in *DescribeProfileRequest, opts ...grpc.CallOption) (*DescribeProfileResponse, error)
 }
 
 type certificateProviderServiceClient struct {
@@ -143,6 +155,16 @@ func (c *certificateProviderServiceClient) ValidateConfig(ctx context.Context, i
 	return out, nil
 }
 
+func (c *certificateProviderServiceClient) DescribeProfile(ctx context.Context, in *DescribeProfileRequest, opts ...grpc.CallOption) (*DescribeProfileResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DescribeProfileResponse)
+	err := c.cc.Invoke(ctx, CertificateProviderService_DescribeProfile_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // CertificateProviderServiceServer is the server API for CertificateProviderService service.
 // All implementations must embed UnimplementedCertificateProviderServiceServer
 // for forward compatibility.
@@ -167,6 +189,17 @@ type CertificateProviderServiceServer interface {
 	HealthCheck(context.Context, *HealthCheckRequest) (*HealthCheckResponse, error)
 	// ValidateConfig checks if a given configuration is valid for this gateway.
 	ValidateConfig(context.Context, *ValidateConfigRequest) (*ValidateConfigResponse, error)
+	// DescribeProfile reports what a CA's own profile — a Vault role, an ACME
+	// profile — will actually produce, so a caller can check a declared key
+	// usage against reality instead of sending it and hoping.
+	//
+	// Optional. A gateway with nothing useful to say (ACME, where the profile
+	// decides in a way this contract cannot predict; selfsigned, which has no
+	// profiles because it enforces directly) returns Unimplemented, which is a
+	// supported answer and not a crash — the three reference gateways only one
+	// of them implements this, and callers must treat Unimplemented the same
+	// way they treat any other gateway not implementing an optional call.
+	DescribeProfile(context.Context, *DescribeProfileRequest) (*DescribeProfileResponse, error)
 	mustEmbedUnimplementedCertificateProviderServiceServer()
 }
 
@@ -200,6 +233,9 @@ func (UnimplementedCertificateProviderServiceServer) HealthCheck(context.Context
 }
 func (UnimplementedCertificateProviderServiceServer) ValidateConfig(context.Context, *ValidateConfigRequest) (*ValidateConfigResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ValidateConfig not implemented")
+}
+func (UnimplementedCertificateProviderServiceServer) DescribeProfile(context.Context, *DescribeProfileRequest) (*DescribeProfileResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DescribeProfile not implemented")
 }
 func (UnimplementedCertificateProviderServiceServer) mustEmbedUnimplementedCertificateProviderServiceServer() {
 }
@@ -367,6 +403,24 @@ func _CertificateProviderService_ValidateConfig_Handler(srv interface{}, ctx con
 	return interceptor(ctx, in, info, handler)
 }
 
+func _CertificateProviderService_DescribeProfile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DescribeProfileRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CertificateProviderServiceServer).DescribeProfile(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CertificateProviderService_DescribeProfile_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CertificateProviderServiceServer).DescribeProfile(ctx, req.(*DescribeProfileRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // CertificateProviderService_ServiceDesc is the grpc.ServiceDesc for CertificateProviderService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -405,6 +459,10 @@ var CertificateProviderService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ValidateConfig",
 			Handler:    _CertificateProviderService_ValidateConfig_Handler,
+		},
+		{
+			MethodName: "DescribeProfile",
+			Handler:    _CertificateProviderService_DescribeProfile_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
