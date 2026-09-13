@@ -55,6 +55,40 @@ each one has been got wrong at least once:
   exist, and everything downstream — renewal, revocation, expiry — then acts on
   a fiction.
 
+## Checking it
+
+```
+go run github.com/certpilot/certpilot-gateway-sdk/cmd/conformance@latest \
+    -addr localhost:9443 -insecure -domain test.example.com
+```
+
+It makes real calls and prints sentences:
+
+```
+provider.v1 conformance — 127.0.0.1:19091
+
+  ok    GetCapabilities                          selfsigned (selfsigned), key types RSA, ECDSA, Ed25519
+  ok    ValidateConfig (rejects malformed JSON)  this is not valid JSON: invalid character 'h'
+  ok    IssueCertificate (honours csr_pem)       signed the supplied key, returned no private key
+  --    RevokeCertificate                        skipped: the gateway reports supports_revocation=false
+```
+
+The three gateways in the CertPilot tree are kept honest by live tests against a
+real Vault and a real ACME server, which you cannot run. This is the
+substitute — without something equivalent, "write your own gateway" means
+"write your own and find out in production".
+
+A skipped check never fails the run, and the report says so at the end rather
+than letting a run that tested four things be remembered as "conformance
+passed".
+
+**The check worth knowing about before you start** is `IssueCertificate
+(honours csr_pem)`. It issues against a CSR it generated and compares the public
+key in the certificate you return against the one it asked you to sign. A
+gateway that generates its own key instead passes every test its author is
+likely to write, and fails much later as a certificate that does not match its
+private key.
+
 ## Registering it
 
 A gateway is reachable over the network, so the core does not need to have
