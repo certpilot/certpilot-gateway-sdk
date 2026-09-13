@@ -70,17 +70,28 @@ writes material for local work.
 
 ## The compatibility promise
 
-**A version here is a promise about a wire contract, not about a Go API.**
+**The promise is about the wire, and it is not the module's version number.**
 
-The reason to say that out loud is that the two come apart. Generated protobuf
-code changes shape for reasons that have nothing to do with the wire — a
-regenerated file can move a struct field and break a Go build while every byte
-on the network stays identical. If that were allowed to force a major version,
-`v1` would stop meaning anything within a year.
+Two different things get versioned here and conflating them is how a promise
+like this rots:
 
-So, for as long as this module is `v1`:
+| | |
+|:---|:---|
+| `provider.v1` | the **wire contract** — the proto package. This is what a gateway actually implements, and what the promise below is about |
+| `v0.x.y` on the Go module | the **Go API** of this repository: `grpckit`, `x509util`, `crypto`, and the shape of the generated structs |
 
-- **A gateway built against any `v1.x` keeps working against any core that
+They come apart constantly. A regenerated protobuf file can move a struct field
+and break a Go build while every byte on the network stays identical. If that
+were allowed to force a major version, the wire version would stop meaning
+anything within a year.
+
+### What is promised, starting now
+
+Not "once we reach v1.0.0" — now, at `v0.1.0`, because the contract below has
+been in production across three gateways for the life of the project and the
+module version says nothing about it:
+
+- **A gateway that implements `provider.v1` keeps working against any core that
   speaks `provider.v1`.** Two minor versions ahead, ten — it keeps working, or
   the change that broke it was a mistake and gets reverted.
 - **New fields are added, never renumbered or reused.** A field the other end
@@ -88,14 +99,26 @@ So, for as long as this module is `v1`:
   on.
 - **New RPCs may be added.** A core that calls one your gateway does not
   implement gets `Unimplemented`, and that is a supported answer, not a crash.
-- **Nothing is removed and nothing changes meaning inside `v1`.** A breaking
-  change to the wire is `provider.v2`, served alongside `v1` for as long as it
-  takes.
+- **Nothing is removed and nothing changes meaning inside `provider.v1`.** A
+  breaking change to the wire is `provider.v2`, served alongside `v1` for as
+  long as it takes.
 
-What is *not* promised: `grpckit`, `x509util` and `crypto` are ordinary Go
-packages and follow ordinary Go semver. They are conveniences. If one of them
-ever gets in your way, implement the generated interface directly — that is the
-contract, and the rest is help.
+`buf breaking` enforces every line of that on each pull request. It is the only
+part of this README that is checked rather than asserted, which is why it is
+worth more than the rest of the section.
+
+### What is not promised yet
+
+**The Go API, while the module is `v0.x`.** `grpckit`, `x509util` and `crypto`
+are conveniences, this is their first release outside the tree that grew them,
+and the honest thing is to say they may move rather than to tag `v1.0.0` today
+and discover the same week that one of them wants a different signature. Pin an
+exact version.
+
+`v1.0.0` is for when a gateway written outside this repository has actually
+been built against these packages and they have survived the contact. If one of
+them gets in your way before then, implement the generated interface directly
+— that is the contract, and the rest is help.
 
 ## Regenerating
 

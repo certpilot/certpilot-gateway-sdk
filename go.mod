@@ -1,8 +1,12 @@
 // The contract between the CertPilot core and a certificate authority gateway.
 //
 // Published separately from the core so that a gateway can be written without
-// commit access to it. A version here is a promise about a wire contract
-// rather than a Go API; see README.md, which states that promise in full.
+// commit access to it.
+//
+// The stable thing here is the wire contract, `provider.v1`, not this module's
+// version: a regenerated protobuf file can move a Go struct field while every
+// byte on the network stays identical. README.md states which of the two each
+// promise attaches to.
 module github.com/certpilot/certpilot-gateway-sdk
 
 go 1.26.6
