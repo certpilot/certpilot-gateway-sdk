@@ -13,6 +13,10 @@ API — and answers in the shapes defined here.
 go get github.com/certpilot/certpilot-gateway-sdk
 ```
 
+Current release: **v0.2.0**. The three gateways CertPilot maintains build
+against it with no `replace` directive, from their own repositories — which is
+the only real test of whether this is published or merely copied.
+
 ## What is in here
 
 | Package | |
@@ -121,9 +125,9 @@ anything within a year.
 
 ### What is promised, starting now
 
-Not "once we reach v1.0.0" — now, at `v0.1.0`, because the contract below has
-been in production across three gateways for the life of the project and the
-module version says nothing about it:
+Not "once we reach v1.0.0" — from the first tag onward, because the contract
+below has been in production across three gateways for the life of the project
+and the module version says nothing about it:
 
 - **A gateway that implements `provider.v1` keeps working against any core that
   speaks `provider.v1`.** Two minor versions ahead, ten — it keeps working, or
