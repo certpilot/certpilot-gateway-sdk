@@ -13,7 +13,7 @@ API — and answers in the shapes defined here.
 go get github.com/certpilot/certpilot-gateway-sdk
 ```
 
-Current release: **v0.2.0**. The three gateways CertPilot maintains build
+Current release: **v0.3.0**. The three gateways CertPilot maintains build
 against it with no `replace` directive, from their own repositories — which is
 the only real test of whether this is published or merely copied.
 
@@ -34,9 +34,11 @@ is not publishable, and the day you discover that is the day you try to move it.
 
 ## Writing one
 
-Eight methods. Four of them are metadata and take an afternoon; the three
+Nine methods. Four of them are metadata and take an afternoon; the three
 lifecycle calls are the work, and `ValidateConfig` is what makes a
-misconfiguration visible before a certificate depends on it.
+misconfiguration visible before a certificate depends on it. The ninth,
+`DescribeProfile`, is optional — answering `Unimplemented` is a supported
+answer, and two of the three reference gateways do exactly that.
 
 The long-form guide is
 [`docs/writing-a-gateway.md`](https://github.com/certpilot/certpilot/blob/main/docs/writing-a-gateway.md)
