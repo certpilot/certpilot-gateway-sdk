@@ -1,0 +1,57 @@
+name: Release
+
+# The release page for each tag. The module needs only the tag, which the Go
+# module proxy serves from, but the Releases page is where somebody evaluating
+# a dependency looks first. Nothing used to create it: v0.3.0 was tagged and
+# served for nine days while this repository's Releases page still said v0.2.0,
+# because the page was a step somebody had to remember (certpilot/certpilot#101).
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: publish release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create the release for this tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+
+          # Re-running a tag's workflow, or a release written by hand before this
+          # ran, must neither fail nor overwrite what is there.
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "$TAG already has a release; leaving it as it is."
+            exit 0
+          fi
+
+          # An annotated tag's message is the release notes, written by whoever cut
+          # the tag. A lightweight tag carries none, so GitHub lists the pull
+          # requests merged since the previous release instead.
+          notes=(--generate-notes)
+          ref=$(gh api "repos/$GH_REPO/git/ref/tags/$TAG")
+          if [ "$(jq -r .object.type <<<"$ref")" = tag ]; then
+            gh api "repos/$GH_REPO/git/tags/$(jq -r .object.sha <<<"$ref")" --jq .message \
+              | sed '/^-----BEGIN [A-Z ]*SIGNATURE-----$/,$d' > "$RUNNER_TEMP/notes.md"
+            notes=(--notes-file "$RUNNER_TEMP/notes.md")
+          fi
+
+          # Latest only for the highest version. A fix to an older line must not
+          # take the badge from the newest one, and a prerelease never has it.
+          flags=(--latest=false)
+          if [[ "$TAG" == *-* ]]; then
+            flags+=(--prerelease)
+          else
+            highest=$(gh api "repos/$GH_REPO/tags" --paginate --jq '.[].name' \
+              | { grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' || true; } | sort -V | tail -n 1)
+            [ "$highest" = "$TAG" ] && flags=(--latest=true)
+          fi
+
+          gh release create "$TAG" --verify-tag --title "$TAG" "${notes[@]}" "${flags[@]}"
