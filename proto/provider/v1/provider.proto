@@ -118,6 +118,14 @@ message RenewCertificateRequest {
   repeated string key_usage = 9;
   // See IssueCertificateRequest.extended_key_usage.
   repeated string extended_key_usage = 10;
+  // Requested validity in days, as on IssueCertificateRequest (CA may
+  // override). Restated on every renewal for the same reason as ca_profile:
+  // without it a gateway applies its own default, and a 90-day certificate
+  // renewed into a 365-day one, reported success, and raised no finding,
+  // because the core's lifetime check had nothing to compare against
+  // (certpilot/certpilot#102). Zero means the gateway's default, which is what
+  // every renewal meant before this field existed.
+  int32 validity_days = 11;
 }
 
 message RenewCertificateResponse {
