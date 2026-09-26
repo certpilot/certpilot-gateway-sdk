@@ -13,7 +13,7 @@ API — and answers in the shapes defined here.
 go get github.com/certpilot/certpilot-gateway-sdk
 ```
 
-Current release: **v0.3.0**. The three gateways CertPilot maintains build
+Current release: **v0.4.0**. The three gateways CertPilot maintains build
 against it with no `replace` directive, from their own repositories — which is
 the only real test of whether this is published or merely copied.
 

@@ -285,8 +285,16 @@ type RenewCertificateRequest struct {
 	KeyUsage []string `protobuf:"bytes,9,rep,name=key_usage,json=keyUsage,proto3" json:"key_usage,omitempty"`
 	// See IssueCertificateRequest.extended_key_usage.
 	ExtendedKeyUsage []string `protobuf:"bytes,10,rep,name=extended_key_usage,json=extendedKeyUsage,proto3" json:"extended_key_usage,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	// Requested validity in days, as on IssueCertificateRequest (CA may
+	// override). Restated on every renewal for the same reason as ca_profile:
+	// without it a gateway applies its own default, and a 90-day certificate
+	// renewed into a 365-day one, reported success, and raised no finding,
+	// because the core's lifetime check had nothing to compare against
+	// (certpilot/certpilot#102). Zero means the gateway's default, which is what
+	// every renewal meant before this field existed.
+	ValidityDays  int32 `protobuf:"varint,11,opt,name=validity_days,json=validityDays,proto3" json:"validity_days,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *RenewCertificateRequest) Reset() {
@@ -387,6 +395,13 @@ func (x *RenewCertificateRequest) GetExtendedKeyUsage() []string {
 		return x.ExtendedKeyUsage
 	}
 	return nil
+}
+
+func (x *RenewCertificateRequest) GetValidityDays() int32 {
+	if x != nil {
+		return x.ValidityDays
+	}
+	return 0
 }
 
 type RenewCertificateResponse struct {
@@ -1337,7 +1352,7 @@ const file_provider_v1_provider_proto_rawDesc = "" +
 	"\x12extended_key_usage\x18\t \x03(\tR\x10extendedKeyUsage\"\x9a\x01\n" +
 	"\x18IssueCertificateResponse\x12F\n" +
 	"\vcertificate\x18\x01 \x01(\v2$.certpilot.common.v1.CertificateInfoR\vcertificate\x126\n" +
-	"\x17provider_certificate_id\x18\x02 \x01(\tR\x15providerCertificateId\"\x85\x03\n" +
+	"\x17provider_certificate_id\x18\x02 \x01(\tR\x15providerCertificateId\"\xaa\x03\n" +
 	"\x17RenewCertificateRequest\x126\n" +
 	"\x17provider_certificate_id\x18\x01 \x01(\tR\x15providerCertificateId\x12\x17\n" +
 	"\acsr_pem\x18\x02 \x01(\fR\x06csrPem\x12\x18\n" +
@@ -1350,7 +1365,8 @@ const file_provider_v1_provider_proto_rawDesc = "" +
 	"ca_profile\x18\b \x01(\tR\tcaProfile\x12\x1b\n" +
 	"\tkey_usage\x18\t \x03(\tR\bkeyUsage\x12,\n" +
 	"\x12extended_key_usage\x18\n" +
-	" \x03(\tR\x10extendedKeyUsage\"\x9a\x01\n" +
+	" \x03(\tR\x10extendedKeyUsage\x12#\n" +
+	"\rvalidity_days\x18\v \x01(\x05R\fvalidityDays\"\x9a\x01\n" +
 	"\x18RenewCertificateResponse\x12F\n" +
 	"\vcertificate\x18\x01 \x01(\v2$.certpilot.common.v1.CertificateInfoR\vcertificate\x126\n" +
 	"\x17provider_certificate_id\x18\x02 \x01(\tR\x15providerCertificateId\"\xbc\x01\n" +
