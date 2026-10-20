@@ -11,8 +11,8 @@ jobs:
     name: build and test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
           cache-dependency-path: go.sum
@@ -42,7 +42,7 @@ jobs:
     # longer existed and passed unconditionally for the whole time it ran. The
     # `ls pb` below is there so that failure mode announces itself instead.
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: bufbuild/buf-setup-action@v1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -74,7 +74,7 @@ jobs:
     # Adding fields and RPCs is fine and passes. That is the whole point of the
     # scheme.
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: bufbuild/buf-setup-action@v1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
