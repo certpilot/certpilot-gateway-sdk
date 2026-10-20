@@ -1,0 +1,33 @@
+name: Vulnerabilities
+
+# Known vulnerabilities in what this is built from: the Go modules and the
+# standard library it calls, its npm dependencies, and the image it ships.
+#
+# On every pull request and push to main, and weekly: an advisory published
+# in a quiet week is still a vulnerability in what people are running, and
+# nothing else here would say so until somebody happened to look. That is
+# how nine standard-library advisories and an end-of-life base image reached
+# a release unnoticed.
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  go:
+    name: govulncheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      # Fails on a vulnerability in code this calls. One in a package it
+      # imports but never reaches is listed and does not fail the job.
+      - run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
